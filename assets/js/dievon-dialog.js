@@ -359,10 +359,36 @@
 
     window.dvConfirmForm = function (form, message, opts) {
         opts = Object.assign({ danger: true, confirmText: 'Delete', cancelText: 'Cancel' }, opts || {});
-        window.dievonConfirm(message, opts).then(function (ok) {
+
+        /* This returns false ALWAYS, and the form is submitted only from inside
+           the dialog's callback. That is correct while the dialog works and
+           merciless when it does not: if the panel never paints, or its promise
+           never settles, the button does nothing at all — no submit, no error,
+           no dialog. A Delete that silently does nothing reads as a broken
+           delete, and the only response available is to press it again.
+
+           So the custom dialog is now an enhancement rather than the mechanism.
+           If it is missing, does not return a promise, or throws, the browser's
+           own confirm() answers instead and TRUE is returned so the native
+           submit proceeds. The destructive action still cannot happen without
+           someone agreeing to it; it just can no longer be lost. */
+        var pending;
+        try {
+            pending = (typeof window.dievonConfirm === 'function')
+                ? window.dievonConfirm(message, opts)
+                : null;
+        } catch (err) { pending = null; }
+
+        if (!pending || typeof pending.then !== 'function') {
+            return window.confirm(message);   // true lets the form submit itself
+        }
+
+        pending.then(function (ok) {
             // HTMLFormElement.submit() deliberately does NOT fire onsubmit again,
             // so this cannot loop.
             if (ok && form) { form.submit(); }
+        }, function () {
+            if (window.confirm(message) && form) { form.submit(); }
         });
         return false;
     };
