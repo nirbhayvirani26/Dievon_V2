@@ -1,0 +1,87 @@
+DIEVON — UPLOAD LIST  (30 Aug 2026)
+====================================
+
+MODE: ADD / OVERWRITE only.  NEVER mirror or sync.
+      Mirror mode deletes uploads/ and assets/images/ on the live server.
+
+DO NOT UPLOAD:
+  .env                     uploads/                assets/images/
+  database/                reset_admin_password.php
+  admin/setup_database.php
+
+ALREADY LIVE — do not re-upload:
+  assets/js/dievon-dialog.js   (verified byte-identical to live)
+  assets/css/style.css         (verified identical)
+  assets/css/responsive.css    (verified identical)
+
+BEFORE UPLOAD: back up —
+  https://dievon.com/admin/auto_backup.php?token=YOUR_TOKEN
+
+
+FILES (17)
+----------
+(root)/
+  .htaccess                      stop /includes/ and /pages/ being served raw
+
+actions/
+  actions/cart_action.php        silent-change fix
+  actions/newsletter_action.php  CSRF check
+
+admin/
+  admin/attributes.php           Used by column, duplicate warning, honest delete
+  admin/includes/header.php      sidebar highlights the page you are actually on
+  admin/settings.php             favicon fields removed
+
+config/
+  config/config.php              MUST go with pages/home.php and admin/attributes.php
+
+includes/
+  includes/blog_card.php         image fetched once
+  includes/footer.php            newsletter CSRF token
+  includes/header.php            mega-menu photos now WebP
+  includes/product_card.php      image fetched once
+
+pages/
+  pages/404.php                  silent-change fix
+  pages/blog-single.php          image fetched once
+  pages/checkout.php             silent-change fix
+  pages/contact.php              CSRF check + token
+  pages/home.php                 hero/category/occasion images now WebP
+  pages/product.php              image fetched once
+
+
+UPLOAD TOGETHER — these depend on each other
+---------------------------------------------
+  config/config.php  +  pages/home.php  +  admin/attributes.php
+  config/config.php  +  includes/header.php + includes/product_card.php
+                        + includes/blog_card.php + pages/product.php
+                        + pages/blog-single.php
+
+  Uploading any of those WITHOUT config/config.php gives a blank page.
+
+
+SAFE FOR YOUR LIVE FIXES
+-------------------------
+Your hero "Shop Now" links come from the banner link field in the DATABASE, so
+uploading pages/home.php cannot undo what you fixed in admin.
+
+"Shop Ensembles" is built in home.php from the category name "3 Piece Suits",
+which does not exist on live. With config/config.php uploaded, an unknown name
+falls back to /shop — the same address it points at today. Verified.
+
+
+AFTER UPLOAD — CHECK
+--------------------
+  1. Homepage: all six Shop Now / Shop the Edit / Shop Ensembles buttons still work.
+  2. Homepage weight: PNG requests should drop to near zero (was 11).
+  3. Product page + blog: each photo fetched ONCE (DevTools > Network > Img).
+  4. admin > Filters & Attributes: sidebar highlights "Filters & Attributes",
+     and each value lists the products using it.
+  5. admin > Settings: no Favicon fields; header logo upload still works.
+  6. Contact form: send a test enquiry, it must still arrive.
+  7. https://dievon.com/includes/header.php must now return 403.
+
+
+STILL YOURS TO DO
+-----------------
+  * Place one real order (card + COD) and confirm the emails arrive.
