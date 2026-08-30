@@ -45,8 +45,6 @@ try {
 $storeSettingDefaults = [
     'site_name'             => 'Dievon',
     'site_logo'             => '',   // relative path; blank = use the bundled default
-    'site_favicon'          => '',   // browser tab icon; blank = falls back to the logo
-    'site_favicon_dark'     => '',   // dark-mode tab icon; blank = same icon in both themes
     'contact_email'         => 'hello@dievon.com',
     'contact_phone'         => SHOP_PHONE,
     // ── Social profiles ─────────────────────────────────────────────────────
@@ -155,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
             foreach (array_keys($storeSettingDefaults) as $key) {
                 // site_logo is set by the upload below, never by a text field —
                 // skip it here so an absent POST value cannot blank the saved logo.
-                if (in_array($key, ['site_logo', 'site_favicon', 'site_favicon_dark'], true)) { continue; }
+                if ($key === 'site_logo') { continue; }
 
                 // A field that was not submitted is left ALONE, not blanked.
                 //
@@ -197,11 +195,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
                 $stmt->execute(['k' => $key, 'v' => $val, 'v2' => $val]);
             }
 
-            // ── Brand image uploads (header logo + favicon) ─────────────────
-            // Both are stored as a path in store_settings and read everywhere via
-            // siteLogoUrl() / siteFaviconUrl(), so one upload updates the header,
-            // footer, browser tab and invoice at once. Shared loop so the two can
-            // never drift apart in validation or naming.
+            // ── Brand image upload (header logo) ────────────────────────────
+            // Stored as a path in store_settings and read everywhere via
+            // siteLogoUrl(), so one upload updates the header, footer and invoice
+            // at once.
+            //
+            // The tab icons used to be uploaded here too. They are a deployed
+            // asset now — assets/images/logo/favicon.png and favicondark.png — and
+            // siteFaviconUrl() reads nothing else, so offering an upload that the
+            // page would then ignore would be worse than not offering one.
             $brandUploads = [
                 'site_logo' => [
                     'prefix' => 'logo',
@@ -209,30 +211,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
                     'mimes'  => ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'],
                     'maxMb'  => 3,
                 ],
-                'site_favicon' => [
-                    'prefix' => 'favicon',
-                    // .ico allowed here but not for the logo — browsers accept it for tabs.
-                    'exts'   => ['png', 'ico', 'svg', 'webp'],
-                    'mimes'  => ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon',
-                                 'image/svg+xml', 'image/webp'],
-                    'maxMb'  => 1,
-                ],
-                'site_favicon_dark' => [
-                    'prefix' => 'favicondark',
-                    'exts'   => ['png', 'ico', 'svg', 'webp'],
-                    'mimes'  => ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon',
-                                 'image/svg+xml', 'image/webp'],
-                    'maxMb'  => 1,
-                ],
             ];
 
             $logoNotice = '';
             foreach ($brandUploads as $key => $rules) {
-                $short = $rules['prefix'];   // 'logo' | 'favicon'
+                $short = $rules['prefix'];   // 'logo'
 
                 if (!empty($_POST['remove_' . $short])) {
                     // Take the file with it. This used to blank the setting only,
-                    // leaving the logo/favicon in assets/images/logo/ forever —
+                    // leaving the logo in assets/images/logo/ forever —
                     // a folder the Media Library does not even scan, so those
                     // orphans were invisible as well as unreachable.
                     $prev = $pdo->prepare("SELECT setting_value FROM store_settings WHERE setting_key = :k");
@@ -365,21 +352,7 @@ require_once __DIR__ . '/includes/header.php';
                         'logobadtype'    => ['err', 'That file type is not allowed. Use a PNG, JPG, WebP or SVG.'],
                         'logotoobig'     => ['err', 'That logo is larger than 3MB. Please compress it and try again.'],
                         'logofailed'     => ['err', 'The logo could not be written to assets/images/logo/. Check the folder is writable.'],
-                        'faviconsaved'   => ['ok',  'Favicon updated. Browsers may take a refresh or two to show the new tab icon.'],
-                        'faviconremoved' => ['ok',  'Custom favicon removed — the tab icon falls back to your logo.'],
-                        'faviconbadtype' => ['err', 'That file type is not allowed for a favicon. Use a PNG, ICO, SVG or WebP.'],
-                        'favicontoobig'  => ['err', 'That favicon is larger than 1MB. A tab icon should be a few KB.'],
-                        'faviconfailed'  => ['err', 'The favicon could not be written to assets/images/logo/. Check the folder is writable.'],
-                        'favicondarksaved'   => ['ok',  'Dark-mode favicon updated. Tabs in dark mode will now use it.'],
-                        'favicondarkremoved' => ['ok',  'Dark-mode favicon removed — the same icon is used in both themes again.'],
-                        'favicondarkbadtype' => ['err', 'That file type is not allowed. Use a PNG, ICO, SVG or WebP.'],
-                        'favicondarktoobig'  => ['err', 'That icon is larger than 1MB. A tab icon should be a few KB.'],
-                        'favicondarkfailed'  => ['err', 'The dark favicon could not be written to assets/images/logo/. Check the folder is writable.'],
                     ];
-                    $currentFavicon = siteFaviconUrl($pdo);
-                    $usingCustomFav = trim((string)($storeSettings['site_favicon'] ?? '')) !== '';
-                    $faviconDarkUrl = siteFaviconDarkUrl($pdo);
-                    $usingDarkFav   = $faviconDarkUrl !== null;
                     $logoStatus = $_GET['logo'] ?? '';
                     $currentLogo = siteLogoUrl($pdo);
                     $usingCustom = trim((string)($storeSettings['site_logo'] ?? '')) !== '';
@@ -414,55 +387,6 @@ require_once __DIR__ . '/includes/header.php';
                         </div>
                     </div>
 
-                    <div class="settings-logo-row">
-                        <div class="settings-logo-preview settings-favicon-preview">
-                            <img src="<?= htmlspecialchars($currentFavicon) ?>?v=<?= time() ?>" alt="Current favicon" id="faviconPreviewImg">
-                        </div>
-                        <div class="settings-logo-fields">
-                            <label class="form-label">Favicon <span class="settings-logo-sub">(browser tab icon)</span></label>
-                            <p class="settings-logo-hint">
-                                The small icon shown in the browser tab and when someone bookmarks the site.
-                                PNG, ICO, SVG or WebP, up to 1MB — <strong>square works best</strong> (512&times;512px),
-                                since it is displayed at about 16&times;16px.
-                                <?= $usingCustomFav ? '' : ' Currently falling back to your logo — a wide logo can look cramped in a tab, so a square icon is worth uploading.' ?>
-                            </p>
-                            <input type="file" name="site_favicon" class="form-control settings-logo-input"
-                                   accept="image/png,image/x-icon,image/svg+xml,image/webp,.ico"
-                                   onchange="previewNewLogo(this,'faviconPreviewImg',1)">
-                            <?php if ($usingCustomFav): ?>
-                            <label class="settings-logo-remove">
-                                <input type="checkbox" name="remove_favicon" value="1">
-                                Remove custom favicon and fall back to the logo
-                            </label>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="settings-logo-row">
-                        <div class="settings-logo-preview settings-favicon-preview settings-favicon-dark">
-                            <img src="<?= htmlspecialchars($faviconDarkUrl ?? $currentFavicon) ?>?v=<?= time() ?>" alt="Dark mode favicon" id="faviconDarkPreviewImg">
-                        </div>
-                        <div class="settings-logo-fields">
-                            <label class="form-label">Dark Mode Favicon <span class="settings-logo-sub">(optional)</span></label>
-                            <p class="settings-logo-hint">
-                                A dark logo disappears against a dark browser tab. Upload a lighter version here and
-                                browsers will swap to it automatically when the visitor is using dark mode.
-                                <?= $usingDarkFav
-                                    ? 'Currently active — the preview above is shown on a dark background so you can check it reads clearly.'
-                                    : 'Not set — the same icon is used in both light and dark themes.' ?>
-                            </p>
-                            <input type="file" name="site_favicon_dark" class="form-control settings-logo-input"
-                                   accept="image/png,image/x-icon,image/svg+xml,image/webp,.ico"
-                                   onchange="previewNewLogo(this,'faviconDarkPreviewImg',1)">
-                            <?php if ($usingDarkFav): ?>
-                            <label class="settings-logo-remove">
-                                <input type="checkbox" name="remove_favicondark" value="1">
-                                Remove the dark version and use one icon everywhere
-                            </label>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
                     <script>
                     // Show the chosen file straight away, and enforce the same limits the
                     // server does so a bad file is rejected before the upload happens.
@@ -470,7 +394,7 @@ require_once __DIR__ . '/includes/header.php';
                         const f = input.files && input.files[0];
                         if (!f) return;
                         // .ico often reports an empty or non-standard MIME, so accept it by
-                        // extension rather than rejecting a perfectly valid favicon.
+                        // extension rather than rejecting a perfectly valid logo.
                         const isIco = /\.ico$/i.test(f.name);
                         const ok = ['image/png','image/jpeg','image/webp','image/svg+xml',
                                     'image/x-icon','image/vnd.microsoft.icon'];

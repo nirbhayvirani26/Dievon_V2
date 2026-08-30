@@ -5169,11 +5169,14 @@ function siteLogoUrl(?PDO $pdo = null): string {
  * tab makes it unreadable, so this lets a proper square icon be uploaded.
  */
 function siteFaviconUrl(?PDO $pdo = null): string {
-    $stored = $pdo ? storeSetting($pdo, 'site_favicon') : null;
-    $rel = trim((string)($stored ?? ''));
-    if ($rel !== '' && is_file(__DIR__ . '/../' . ltrim($rel, '/'))) {
-        return assetUrlWithVersion($rel);
-    }
+    /* The tab icon is a deployed asset, not a setting.
+       ────────────────────────────────────────────────────────────────────
+       It used to prefer an uploaded site_favicon over the bundled file. The
+       owner's decision is that the icon ships with the code and is not
+       editable from admin, so the stored value is no longer consulted at all
+       — replacing the file in assets/images/logo/ is the only way to change
+       it, and there is one obvious answer to what the icon currently is.
+       Any row left in the settings table from before is simply unread. */
     // Fall back to the bundled square icon before falling back to the logo. The
     // logo is a wide banner; squashed into a 16px tab it is unreadable. This also
     // means the tab icon is correct on a site that has never had one uploaded —
@@ -5196,11 +5199,7 @@ function siteFaviconUrl(?PDO $pdo = null): string {
  * be declared twice for no reason.
  */
 function siteFaviconDarkUrl(?PDO $pdo = null): ?string {
-    $stored = $pdo ? storeSetting($pdo, 'site_favicon_dark') : null;
-    $rel = trim((string)($stored ?? ''));
-    if ($rel !== '' && is_file(__DIR__ . '/../' . ltrim($rel, '/'))) {
-        return assetUrlWithVersion($rel);
-    }
+    // Bundled only, for the same reason as the light icon above.
     // Same bundled fallback as the light icon. Still returns null when there is
     // no dark icon at all, so the caller does not emit half a pair.
     $bundled = 'assets/images/logo/favicondark.png';
