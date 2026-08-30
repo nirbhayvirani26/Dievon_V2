@@ -7874,3 +7874,88 @@ function dievonStrayAttributes(PDO $pdo, string $type): array {
     ksort($found);
     return array_values($found);
 }
+
+/**
+ * Every value products actually carry for one attribute, and which products
+ * carry it. Keyed by the lowercased value.
+ *
+ * dievonStrayAttributes() answers the same question but only for values the
+ * master list does NOT have, because its job is reconciliation. The attributes
+ * screen needs the other half: for a value that IS on the list, who is using it?
+ * Without that the Delete button is a guess. Deleting a listed value does work —
+ * the row goes — but any product still tagged with it keeps the tag, so the
+ * value reappears further down the same page under "in use but not on this
+ * list". Nothing on screen said it would, so the delete looked broken when it
+ * had in fact done exactly what it says.
+ *
+ * Values are split before counting for the same reason the stray reader splits
+ * them: these columns hold lists, so a garment tagged "Cotton, Linen" is using
+ * two listed fabrics, not one unknown one.
+ */
+/**
+ * A loose key for one attribute value, used only to spot the SAME value spelled
+ * two ways — never to decide what a product is.
+ *
+ * "Used by" matches the list's spelling against the product's, exactly. That is
+ * the honest test, but on its own it is a trap: a list holding "Three-Quarter
+ * Sleeve" while the garments say "Three-quarter Sleeves" gets told nothing uses
+ * it, which is true of that string and false of the shopper's experience — the
+ * chip is right there in the shop. Acting on it deletes the wrong row.
+ *
+ * Case, hyphens, slashes and a trailing plural are dropped, so those two collapse
+ * together and the screen can say "nothing carries this exact spelling, but N
+ * products carry <the other one>". It deliberately does NOT try to understand
+ * that "3/4 Sleeves" and "Three-quarter Sleeves" mean the same thing; no string
+ * rule can, and guessing there would merge values that are genuinely different.
+ */
+function dievonAttributeLooseKey(string $value): string {
+    $v = mb_strtolower(trim($value));
+    $v = str_replace(['/', '-', '_'], ' ', $v);
+    $v = preg_replace('/[^a-z0-9 ]+/u', '', $v);
+    $v = preg_replace('/\s+/', ' ', trim((string)$v));
+    if ($v === '') { return ''; }
+    $words = array_map(
+        static fn($w) => (mb_strlen($w) > 3 && str_ends_with($w, 's')) ? substr($w, 0, -1) : $w,
+        explode(' ', $v)
+    );
+    return implode(' ', $words);
+}
+
+function dievonAttributeUsage(PDO $pdo, string $type): array {
+    $found = [];
+
+    if ($type === 'color') {
+        // Colour lives in three places; a colour is "in use" if any of them names it.
+        $sources = [
+            "SELECT id, name, color     AS c FROM products WHERE color     IS NOT NULL AND color     <> ''",
+            "SELECT id, name, color_way AS c FROM products WHERE color_way IS NOT NULL AND color_way <> ''",
+            "SELECT p.id, p.name, pc.color_name AS c
+               FROM product_colors pc JOIN products p ON p.id = pc.product_id
+              WHERE pc.color_name IS NOT NULL AND pc.color_name <> ''",
+        ];
+    } else {
+        $column = DIEVON_ATTR_TYPES[$type]['columns'][0] ?? '';
+        if (!str_starts_with($column, 'products.')) { return []; }
+        $field = substr($column, strlen('products.'));
+        if (!preg_match('/^[a-z_]+$/', $field)) { return []; }   // never interpolate anything else
+        $sources = ["SELECT id, name, `$field` AS c FROM products
+                      WHERE `$field` IS NOT NULL AND `$field` <> ''"];
+    }
+
+    foreach ($sources as $sql) {
+        try { $rows = $pdo->query($sql); } catch (PDOException $e) { continue; }
+        foreach ($rows as $r) {
+            $parts = ($type === 'color')
+                ? dievonColorWayList((string)$r['c'])
+                : dievonSplitAttrList($type, (string)$r['c']);
+            foreach ($parts as $value) {
+                $value = trim($value);
+                if ($value === '') { continue; }
+                $key = strtolower($value);
+                if (!isset($found[$key])) { $found[$key] = ['value' => $value, 'products' => []]; }
+                $found[$key]['products'][(int)$r['id']] = (string)$r['name'];
+            }
+        }
+    }
+    return $found;
+}

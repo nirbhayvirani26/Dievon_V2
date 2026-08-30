@@ -141,8 +141,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete'])) {
         $attrType = $attrTypeFromPost($_POST) ?? 'color';
         $openType = $attrType;
         try {
+            /* Read the name and its users BEFORE the row goes, so the message can
+               say what actually happened.
+               ────────────────────────────────────────────────────────────────
+               "Item deleted successfully." was true and still looked like a lie.
+               Deleting a value that products are tagged with removes it from the
+               list and nothing else — the products keep the tag — so the value
+               reappears seconds later in the "in use but not on this list" box
+               further down the SAME page. Nothing said it would, so the only
+               reading available was that Delete had not worked, and the natural
+               response was to press it again.
+
+               Now the sentence names the garments that kept the value and points
+               at the box it moved to, which is the difference between a screen
+               that looks broken and one that is merely honest about what a list
+               entry is. */
+            $delName = '';
+            $st = $pdo->prepare("SELECT name FROM product_attributes WHERE id = :id");
+            $st->execute(['id' => $delId]);
+            $delName = trim((string)($st->fetchColumn() ?: ''));
+
+            $stillUsing = [];
+            if ($delName !== '') {
+                $usage = dievonAttributeUsage($pdo, $attrType);
+                $stillUsing = $usage[strtolower($delName)]['products'] ?? [];
+            }
+
             $pdo->prepare("DELETE FROM product_attributes WHERE id = :id")->execute(['id' => $delId]);
-            $successMsg = "Item deleted successfully.";
+
+            if ($stillUsing) {
+                $names = array_values($stillUsing);
+                $shown = implode(', ', array_slice($names, 0, 3));
+                if (count($names) > 3) { $shown .= ' and ' . (count($names) - 3) . ' more'; }
+                $successMsg = "'{$delName}' removed from the list, but "
+                            . count($names) . ' product' . (count($names) === 1 ? '' : 's')
+                            . " still carr" . (count($names) === 1 ? 'ies' : 'y') . " it: {$shown}. "
+                            . "It now appears below under \u{201C}in use but not on this list\u{201D} — "
+                            . "retag those products to clear it completely.";
+            } else {
+                $successMsg = $delName !== ''
+                    ? "'{$delName}' deleted. No product was using it."
+                    : "Item deleted successfully.";
+            }
         } catch (PDOException $e) {
             $errorMsg = "Error deleting attribute: " . $e->getMessage();
         }
@@ -420,6 +460,11 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
     $attributes  = $loadList($pdo, $attrType);
     $strayColors = [];
     try { $strayColors = dievonStrayAttributes($pdo, $attrType); } catch (Throwable $e) {}
+    /* Who is using each listed value. Without this the Delete button is a
+       guess: the list alone cannot say whether removing a value is harmless
+       or leaves garments tagged with something no longer on it. */
+    $attrUsage = [];
+    try { $attrUsage = dievonAttributeUsage($pdo, $attrType); } catch (Throwable $e) {}
     $addHint = [
         'color'   => 'Colour name (e.g. Emerald Green, Rose Gold)',
         'sleeve'  => 'Sleeve (e.g. Three-quarter Sleeves, Long Sleeve)',
@@ -544,12 +589,13 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                         <th style="width: 60px;">ID</th>
                         <th><?= htmlspecialchars($attrMeta['label']) ?></th>
                         <?php if ($attrType === 'color'): ?><th>Colour Code</th><?php endif; ?>
-                        <th style="width: 100px; text-align: right;">Action</th>
+                        <th>Used by</th>
+                        <th style="width: 300px; text-align: right;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($attributes)): ?>
-                        <tr><td colspan="4" style="padding: 20px; text-align: center; color: var(--text-muted);">
+                        <tr><td colspan="<?= $attrType === 'color' ? 5 : 4 ?>" style="padding: 20px; text-align: center; color: var(--text-muted);">
                             Nothing on this list yet. Until one value is added, products keep whatever they already
                             hold and nothing is refused — so there is no rush and no way to be locked out.
                         </td></tr>
@@ -570,9 +616,88 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                                         <?php endif; ?>
                                     </td>
                                 <?php endif; ?>
+                                <?php
+                                   /* Named, not counted — the same rule the stray table
+                                      below follows. "3 products" cannot be acted on; three
+                                      garment names can. */
+                                   $uses = $attrUsage[strtolower(trim((string)$a['name']))]['products'] ?? [];
+                                   $useNames = array_values($uses);
+                                   /* Nothing carries this exact spelling — but is the same value
+                                      sitting on the products under a different one? Saying "safe to
+                                      delete" without checking is how the wrong row gets deleted while
+                                      the chip it was blamed for stays in the shop. */
+                                   $nearMiss = [];
+                                   if (!$useNames) {
+                                       $loose = dievonAttributeLooseKey((string)$a['name']);
+                                       if ($loose !== '') {
+                                           foreach ($attrUsage as $uKey => $uRow) {
+                                               if ($uKey === strtolower(trim((string)$a['name']))) { continue; }
+                                               if (dievonAttributeLooseKey($uRow['value']) === $loose) {
+                                                   $nearMiss[] = ['value' => $uRow['value'], 'n' => count($uRow['products'])];
+                                               }
+                                           }
+                                       }
+                                   }
+                                ?>
+                                <td style="font-size:12px; color:var(--text-muted);">
+                                    <?php if (!$useNames && $nearMiss): ?>
+                                        <span style="color:#b45309;">
+                                            No product uses this exact spelling, but
+                                            <?php foreach ($nearMiss as $i => $nm): ?><?= $i ? ' and ' : ' ' ?><strong><?= htmlspecialchars($nm['value']) ?></strong>
+                                                is on <?= (int)$nm['n'] ?> product<?= $nm['n'] === 1 ? '' : 's' ?><?php endforeach; ?>.
+                                            Deleting this row will not change those &mdash; merge them instead.
+                                        </span>
+                                    <?php elseif (!$useNames): ?>
+                                        <span style="color:var(--text-muted);">Not used &mdash; safe to delete</span>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars(implode(', ', array_slice($useNames, 0, 3))) ?>
+                                        <?php if (count($useNames) > 3): ?>
+                                            <em>and <?= count($useNames) - 3 ?> more</em>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
                                 <td style="text-align:right;">
+                                    <?php
+                                       /* Merge, for the case Delete cannot answer.
+                                          ─────────────────────────────────────────
+                                          The shop's filter chips are built from
+                                          SELECT DISTINCT `<column>` FROM products — they never
+                                          read this list. So a value the garments carry keeps its
+                                          chip no matter what happens here, and deleting the row
+                                          cannot remove it from the shop. That is how a list ends
+                                          up holding the same thing twice — "3/4 Sleeves" AND
+                                          "Three-quarter Sleeves" — with Delete apparently doing
+                                          nothing to either.
+
+                                          The only thing that clears a value is retagging the
+                                          products, which the reconcile rename below already does.
+                                          It was reachable solely from the stray box, so a value ON
+                                          the list had no way to reach it without being deleted
+                                          first to make it a stray. Exposed here, the duplicate is
+                                          merged in one press and the row is then genuinely unused,
+                                          which the Used by column says out loud. */
+                                       $mergeTargets = array_values(array_filter($attributes,
+                                           static fn($o) => (int)$o['id'] !== (int)$a['id']));
+                                    ?>
+                                    <?php if ($useNames && $mergeTargets): ?>
+                                        <form method="POST" action="attributes.php" style="display:inline-flex; gap:6px; align-items:center;">
+                                            <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+                                            <input type="hidden" name="attr_type" value="<?= htmlspecialchars($attrType) ?>">
+                                            <input type="hidden" name="stray" value="<?= htmlspecialchars($a['name']) ?>">
+                                            <select name="rename_to" class="form-control" style="width:150px; padding:5px 8px; font-size:12px;" required>
+                                                <option value="">Merge into&hellip;</option>
+                                                <?php foreach ($mergeTargets as $t): ?>
+                                                    <option value="<?= htmlspecialchars($t['name']) ?>"><?= htmlspecialchars($t['name']) ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" name="reconcile" value="rename" class="btn-secondary" style="padding:5px 10px; font-size:12px;"
+                                                    data-confirm-rename="Retag <?= count($useNames) ?> product(s) from <?= htmlspecialchars($a['name'], ENT_QUOTES) ?> to the value you picked?&#10;&#10;Only the label changes. Nothing else about a product moves.">
+                                                Merge
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                     <form method="POST" action="attributes.php" style="display:inline;"
-                                          onsubmit="return dvConfirmForm(this,'Delete this entry? Products already using it keep it until you change them.');">
+                                          onsubmit="return dvConfirmForm(this,'<?= $useNames ? htmlspecialchars(count($useNames) . ' product' . (count($useNames)===1?'':'s') . ' still use' . (count($useNames)===1?'s':'') . ' this. Deleting removes it from the list only — those products keep the value and it will reappear below as \'in use but not on this list\'. Continue?', ENT_QUOTES) : 'Delete this entry? No product is using it.' ?>');">
                                         <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
                                         <input type="hidden" name="attr_type" value="<?= htmlspecialchars($attrType) ?>">
                                         <button type="submit" name="delete" value="<?= (int)$a['id'] ?>" class="btn-danger" style="padding:5px 10px; font-size:12px;">
