@@ -465,6 +465,16 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
        or leaves garments tagged with something no longer on it. */
     $attrUsage = [];
     try { $attrUsage = dievonAttributeUsage($pdo, $attrType); } catch (Throwable $e) {}
+    /* product_attributes is unique on id ONLY — nothing stops the same name
+       being on a list twice, and older rows predate the clash check the add
+       form does now. Two identical rows are indistinguishable in the table, so
+       deleting one leaves what looks like the same row still sitting there and
+       Delete appears to do nothing. Counted here so the row can say it. */
+    $dupeCount = [];
+    foreach ($attributes as $dRow) {
+        $dKey = mb_strtolower(trim((string)$dRow['name']));
+        $dupeCount[$dKey] = ($dupeCount[$dKey] ?? 0) + 1;
+    }
     $addHint = [
         'color'   => 'Colour name (e.g. Emerald Green, Rose Gold)',
         'sleeve'  => 'Sleeve (e.g. Three-quarter Sleeves, Long Sleeve)',
@@ -603,7 +613,16 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                         <?php foreach ($attributes as $a): ?>
                             <tr>
                                 <td><?= (int)$a['id'] ?></td>
-                                <td style="font-weight:600;"><?= htmlspecialchars($a['name']) ?></td>
+                                <td style="font-weight:600;">
+                                    <?= htmlspecialchars($a['name']) ?>
+                                    <?php $dN = $dupeCount[mb_strtolower(trim((string)$a['name']))] ?? 1; ?>
+                                    <?php if ($dN > 1): ?>
+                                        <span style="display:block; font-weight:400; font-size:11px; color:#b45309;">
+                                            This name is on the list <?= (int)$dN ?> times (ids differ) &mdash;
+                                            deleting one leaves the others, which look identical. Delete each.
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
                                 <?php if ($attrType === 'color'): ?>
                                     <td>
                                         <?php $hex = trim((string)($a['code'] ?? '')); ?>
@@ -645,7 +664,9 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                                             No product uses this exact spelling, but
                                             <?php foreach ($nearMiss as $i => $nm): ?><?= $i ? ' and ' : ' ' ?><strong><?= htmlspecialchars($nm['value']) ?></strong>
                                                 is on <?= (int)$nm['n'] ?> product<?= $nm['n'] === 1 ? '' : 's' ?><?php endforeach; ?>.
-                                            Deleting this row will not change those &mdash; merge them instead.
+                                            Deleting this row only removes the spelling below from the
+                                            product form; it will not touch those garments or the shop
+                                            filter. Open them from the row above and change the value there.
                                         </span>
                                     <?php elseif (!$useNames): ?>
                                         <span style="color:var(--text-muted);">Not used &mdash; safe to delete</span>
