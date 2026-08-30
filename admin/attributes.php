@@ -681,7 +681,7 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                                 </td>
                                 <td style="text-align:right;">
                                     <form method="POST" action="attributes.php" style="display:inline;"
-                                          onsubmit="return dvConfirmForm(this,'<?= $useNames ? htmlspecialchars(count($useNames) . ' product' . (count($useNames)===1?'':'s') . ' still use' . (count($useNames)===1?'s':'') . ' this. Deleting removes it from the list only — those products keep the value and it will reappear below as \'in use but not on this list\'. Continue?', ENT_QUOTES) : 'Delete this entry? No product is using it.' ?>');">
+                                          onsubmit="return dvConfirmForm(this,'<?= $useNames ? htmlspecialchars(count($useNames) . ' product' . (count($useNames)===1?'':'s') . ' still use' . (count($useNames)===1?'s':'') . ' this. Deleting removes it from the list only — those products keep the value and it will reappear below under “in use but not on this list”. Continue?', ENT_QUOTES) : 'Delete this entry? No product is using it.' ?>');">
                                         <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
                                         <input type="hidden" name="attr_type" value="<?= htmlspecialchars($attrType) ?>">
                                         <button type="submit" name="delete" value="<?= (int)$a['id'] ?>" class="btn-danger" style="padding:5px 10px; font-size:12px;">
