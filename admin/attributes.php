@@ -590,7 +590,7 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                         <th><?= htmlspecialchars($attrMeta['label']) ?></th>
                         <?php if ($attrType === 'color'): ?><th>Colour Code</th><?php endif; ?>
                         <th>Used by</th>
-                        <th style="width: 300px; text-align: right;">Action</th>
+                        <th style="width: 100px; text-align: right;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -650,52 +650,15 @@ foreach (DIEVON_ATTR_TYPES as $attrType => $attrMeta):
                                     <?php elseif (!$useNames): ?>
                                         <span style="color:var(--text-muted);">Not used &mdash; safe to delete</span>
                                     <?php else: ?>
-                                        <?= htmlspecialchars(implode(', ', array_slice($useNames, 0, 3))) ?>
-                                        <?php if (count($useNames) > 3): ?>
-                                            <em>and <?= count($useNames) - 3 ?> more</em>
-                                        <?php endif; ?>
+                                        <?php /* Every one, linked, and never "and 4 more".
+                                                 Clearing a value means opening each garment that
+                                                 carries it, so a name that is only counted is a
+                                                 product you cannot go and fix. */ ?>
+                                        <?php $i = 0; foreach ($uses as $pid => $pname): ?><?= $i++ ? ', ' : '' ?><a href="product_form.php?id=<?= (int)$pid ?>" style="color:inherit; text-decoration:underline;"><?= htmlspecialchars($pname) ?></a><?php endforeach; ?>
+                                        <span style="white-space:nowrap;">(<?= count($useNames) ?>)</span>
                                     <?php endif; ?>
                                 </td>
                                 <td style="text-align:right;">
-                                    <?php
-                                       /* Merge, for the case Delete cannot answer.
-                                          ─────────────────────────────────────────
-                                          The shop's filter chips are built from
-                                          SELECT DISTINCT `<column>` FROM products — they never
-                                          read this list. So a value the garments carry keeps its
-                                          chip no matter what happens here, and deleting the row
-                                          cannot remove it from the shop. That is how a list ends
-                                          up holding the same thing twice — "3/4 Sleeves" AND
-                                          "Three-quarter Sleeves" — with Delete apparently doing
-                                          nothing to either.
-
-                                          The only thing that clears a value is retagging the
-                                          products, which the reconcile rename below already does.
-                                          It was reachable solely from the stray box, so a value ON
-                                          the list had no way to reach it without being deleted
-                                          first to make it a stray. Exposed here, the duplicate is
-                                          merged in one press and the row is then genuinely unused,
-                                          which the Used by column says out loud. */
-                                       $mergeTargets = array_values(array_filter($attributes,
-                                           static fn($o) => (int)$o['id'] !== (int)$a['id']));
-                                    ?>
-                                    <?php if ($useNames && $mergeTargets): ?>
-                                        <form method="POST" action="attributes.php" style="display:inline-flex; gap:6px; align-items:center;">
-                                            <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
-                                            <input type="hidden" name="attr_type" value="<?= htmlspecialchars($attrType) ?>">
-                                            <input type="hidden" name="stray" value="<?= htmlspecialchars($a['name']) ?>">
-                                            <select name="rename_to" class="form-control" style="width:150px; padding:5px 8px; font-size:12px;" required>
-                                                <option value="">Merge into&hellip;</option>
-                                                <?php foreach ($mergeTargets as $t): ?>
-                                                    <option value="<?= htmlspecialchars($t['name']) ?>"><?= htmlspecialchars($t['name']) ?></option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <button type="submit" name="reconcile" value="rename" class="btn-secondary" style="padding:5px 10px; font-size:12px;"
-                                                    data-confirm-rename="Retag <?= count($useNames) ?> product(s) from <?= htmlspecialchars($a['name'], ENT_QUOTES) ?> to the value you picked?&#10;&#10;Only the label changes. Nothing else about a product moves.">
-                                                Merge
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
                                     <form method="POST" action="attributes.php" style="display:inline;"
                                           onsubmit="return dvConfirmForm(this,'<?= $useNames ? htmlspecialchars(count($useNames) . ' product' . (count($useNames)===1?'':'s') . ' still use' . (count($useNames)===1?'s':'') . ' this. Deleting removes it from the list only — those products keep the value and it will reappear below as \'in use but not on this list\'. Continue?', ENT_QUOTES) : 'Delete this entry? No product is using it.' ?>');">
                                         <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
