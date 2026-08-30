@@ -12,6 +12,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
+/* The address is stored and later mailed, so an unprotected endpoint lets any
+   other site sign a visitor up in the background. Every other write on the
+   site carries this token; this one was reachable without it. */
+if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+    echo json_encode(['success' => false, 'message' => 'Your session expired. Please refresh the page and try again.']);
+    exit;
+}
+
 $email = strtolower(trim($_POST['email'] ?? ''));
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

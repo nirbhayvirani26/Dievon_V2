@@ -49,6 +49,27 @@ RewriteRule (^|/)\. - [F,L]
 # it would not travel with the code. This lives in the tracked root file instead.
 RewriteRule ^uploads/.*\.(?i:php|phtml|phar|php3|php4|php5|php7|phps|cgi|pl|py|sh|exe|htaccess)$ - [F,L]
 
+# Partials and page bodies are not addresses.
+# ------------------------------------------------------------------
+# Every file under includes/ and pages/ sits inside the web root, so Apache was
+# happy to serve one on request. includes/header.php answered with 44 KB of a
+# page that has no content and no </html> — and, because it prints the site's
+# own <head>, it declared <link rel="canonical" href=".../includes/header.php">,
+# pointing at ITSELF. A broken fragment nominating itself as a canonical URL is
+# exactly what a crawler indexes, and /includes/ is not in robots.txt.
+#
+# includes/ is never a rewrite target, so it is refused outright.
+#
+# pages/ IS the internal target of the clean-URL rules below, so it may only be
+# refused on a request that arrived from outside. On an internal rewrite Apache
+# re-enters this file with REDIRECT_STATUS set; on the browser's original
+# request it is empty. Testing for empty blocks /pages/home.php from the outside
+# while leaving /about -> pages/about.php working.
+RewriteRule ^includes/ - [F,L]
+
+RewriteCond %{ENV:REDIRECT_STATUS} ^$
+RewriteRule ^pages/ - [F,L]
+
 # -1. Force HTTPS in production only — skips localhost/MAMP (matches the same host check
 # config.php uses for $isLocal) so local development keeps working over plain HTTP.
 # Safe to leave active even before SSL is confirmed on the live domain: it only fires for

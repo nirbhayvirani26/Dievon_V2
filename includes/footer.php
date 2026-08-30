@@ -190,6 +190,9 @@ $minimalFooter = !empty($minimalFooter);
                  signup here is recorded in newsletter_subscribers exactly as one
                  from anywhere else. */ ?>
         <form method="POST" onsubmit="return submitHomeNewsletter(event, this);">
+            <?php /* submitHomeNewsletter() posts a FormData built from this form,
+                     so the token travels with it without touching the script. */ ?>
+            <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
             <div class="newsletter-input-wrap">
                 <input type="email" id="newsletterEmailInput" name="email" class="animated-input" required autocomplete="email" placeholder=" ">
                 <label for="newsletterEmailInput" class="animated-label">Enter your email address</label>

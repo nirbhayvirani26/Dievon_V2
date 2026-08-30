@@ -14,60 +14,67 @@ $success = false;
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['contact_submit'])) {
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $message = trim($_POST['message'] ?? '');
-    $service = trim($_POST['service'] ?? 'General Enquiry');
-
-    if ($name && $email && $message) {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $error = "Please enter a valid email address.";
-        } else {
-            // Save to database.
-            //
-            // The catch here was empty — a rejected INSERT vanished without a
-            // trace and the visitor was still thanked. The usual cause is dull:
-            // the service label is appended to the name, so a long name overflows
-            // the column and MySQL refuses the row. Values are trimmed to fit,
-            // and a genuine failure is remembered rather than discarded.
-            $messageSaved = false;
-            try {
-                $ins = $pdo->prepare("INSERT INTO inquiries (name, email, phone, message) VALUES (:name, :email, :phone, :message)");
-                $messageSaved = $ins->execute([
-                    'name' => mb_substr($name . " [Service: $service]", 0, 120),
-                    'email' => mb_substr($email, 0, 180),
-                    'phone' => mb_substr($phone, 0, 30),
-                    'message' => $message
-                ]);
-            } catch (PDOException $e) {
-                error_log("Contact form DB save error: " . $e->getMessage());
-                $messageSaved = false;
-            }
-
-            // Send notification to Admin & Acknowledgement to Customer via EmailService
-            $mailSent = false;
-            try {
-                require_once __DIR__ . '/../services/EmailService.php';
-                $emailService = new EmailService($pdo);
-                $emailService->sendContactFormEmails($name, $email, $phone, $service, $message);
-                $mailSent = true;
-            } catch (\Throwable $exEmail) {
-                error_log("Contact email dispatch error: " . $exEmail->getMessage());
-            }
-
-            // Confirm only if the message survived somewhere — the database or an
-            // inbox. If neither took it, tell them, rather than thanking them for
-            // something nobody will ever read.
-            if ($messageSaved || $mailSent) {
-                $success = true;
-            } else {
-                $error = "Sorry — we could not send your message just now. Please try again, or email us directly at "
-                       . htmlspecialchars(storeSetting($pdo, 'contact_email', 'info@dievon.com')) . ".";
-            }
-        }
+    /* Same token every other form on the site carries. Without it any page
+       anywhere could post an enquiry in a visitor's name, and the row lands in
+       admin > Enquiries looking exactly like a real one. */
+    if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
+        $error = 'Your session expired. Please refresh the page and send it again.';
     } else {
-        $error = "Please fill in all required fields (Name, Email, and Message).";
+        $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $message = trim($_POST['message'] ?? '');
+        $service = trim($_POST['service'] ?? 'General Enquiry');
+
+        if ($name && $email && $message) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $error = "Please enter a valid email address.";
+            } else {
+                // Save to database.
+                //
+                // The catch here was empty — a rejected INSERT vanished without a
+                // trace and the visitor was still thanked. The usual cause is dull:
+                // the service label is appended to the name, so a long name overflows
+                // the column and MySQL refuses the row. Values are trimmed to fit,
+                // and a genuine failure is remembered rather than discarded.
+                $messageSaved = false;
+                try {
+                    $ins = $pdo->prepare("INSERT INTO inquiries (name, email, phone, message) VALUES (:name, :email, :phone, :message)");
+                    $messageSaved = $ins->execute([
+                        'name' => mb_substr($name . " [Service: $service]", 0, 120),
+                        'email' => mb_substr($email, 0, 180),
+                        'phone' => mb_substr($phone, 0, 30),
+                        'message' => $message
+                    ]);
+                } catch (PDOException $e) {
+                    error_log("Contact form DB save error: " . $e->getMessage());
+                    $messageSaved = false;
+                }
+
+                // Send notification to Admin & Acknowledgement to Customer via EmailService
+                $mailSent = false;
+                try {
+                    require_once __DIR__ . '/../services/EmailService.php';
+                    $emailService = new EmailService($pdo);
+                    $emailService->sendContactFormEmails($name, $email, $phone, $service, $message);
+                    $mailSent = true;
+                } catch (\Throwable $exEmail) {
+                    error_log("Contact email dispatch error: " . $exEmail->getMessage());
+                }
+
+                // Confirm only if the message survived somewhere — the database or an
+                // inbox. If neither took it, tell them, rather than thanking them for
+                // something nobody will ever read.
+                if ($messageSaved || $mailSent) {
+                    $success = true;
+                } else {
+                    $error = "Sorry — we could not send your message just now. Please try again, or email us directly at "
+                           . htmlspecialchars(storeSetting($pdo, 'contact_email', 'info@dievon.com')) . ".";
+                }
+            }
+        } else {
+            $error = "Please fill in all required fields (Name, Email, and Message).";
+        }
     }
 }
 
@@ -118,6 +125,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <?php endif; ?>
 
                     <form action="contact.php" method="POST">
+                        <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
                         <div class="contact-form-row">
                             <div class="form-luxury-group">
                                 <label for="cntName">Full Name *</label>
