@@ -357,6 +357,44 @@
         return false;
     };
 
+    /* Which button was pressed, remembered for form.submit().
+       ────────────────────────────────────────────────────────────────────────
+       form.submit() submits with NO submitter, so the pressed button's own
+       name/value never reaches the server. Almost every confirm on this site
+       carries its payload that way — <button name="delete" value="37"> — and
+       the handlers are written as isset($_POST['delete']). Through the dialog
+       that key simply was not there: the handler did not run, the page reloaded
+       unchanged, and the row was still sitting there with no error to explain
+       it. Deleting the same row straight from SQL always worked, which is what
+       finally placed the fault here rather than in the query or the data.
+
+       Captured on the way down so it is recorded before any other click handler
+       can stop the event, and re-attached as a hidden field at submit time.
+       requestSubmit(button) would carry the submitter properly, but it re-fires
+       onsubmit — which is this very function — so it cannot be used here. */
+    var dvLastSubmitter = null;
+    document.addEventListener('click', function (e) {
+        var el = e.target && e.target.closest
+            ? e.target.closest('button[type="submit"], input[type="submit"], button:not([type])')
+            : null;
+        if (el && el.form) { dvLastSubmitter = el; }
+    }, true);
+
+    function dvSubmitWithButton(form) {
+        if (!form) { return; }
+        var btn = dvLastSubmitter;
+        if (btn && btn.form === form && btn.name &&
+            !form.querySelector('input[data-dv-submitter]')) {
+            var hidden = document.createElement('input');
+            hidden.type  = 'hidden';
+            hidden.name  = btn.name;
+            hidden.value = btn.value;
+            hidden.setAttribute('data-dv-submitter', '');
+            form.appendChild(hidden);
+        }
+        form.submit();
+    }
+
     window.dvConfirmForm = function (form, message, opts) {
         opts = Object.assign({ danger: true, confirmText: 'Delete', cancelText: 'Cancel' }, opts || {});
 
@@ -386,9 +424,9 @@
         pending.then(function (ok) {
             // HTMLFormElement.submit() deliberately does NOT fire onsubmit again,
             // so this cannot loop.
-            if (ok && form) { form.submit(); }
+            if (ok && form) { dvSubmitWithButton(form); }
         }, function () {
-            if (window.confirm(message) && form) { form.submit(); }
+            if (window.confirm(message) && form) { dvSubmitWithButton(form); }
         });
         return false;
     };
