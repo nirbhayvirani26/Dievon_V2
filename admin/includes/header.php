@@ -310,7 +310,13 @@ $validTabs = [
        whitelist, and the sidebar highlighted Orders & Invoices while you stood on
        Suppliers. Any new admin screen needs its tab name added here as well as a
        menu row, or it will look like it belongs to another page. */
-    'suppliers'
+    'suppliers',
+    /* attributes.php sets $activeTab from its own ?type= tab, so every tab that
+       screen can open has to be here. Only 'colors' and 'sizes' were, so standing
+       on Sleeves, Necklines, Patterns, Fabrics or Occasions failed the whitelist
+       and lit up Orders & Invoices — the same fault the note above records for
+       suppliers, repeated for five more tabs. */
+    'sleeves', 'necks', 'patterns', 'fabrics', 'occasions'
 ];
 if (!in_array($activeTab, $validTabs)) $activeTab = 'orders';
 
@@ -663,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function() {
                managed on attributes.php — they are the lists that feed the shop's
                filters, and keeping them on one screen means you can see the whole
                set at once instead of hunting a tab or a menu row per list. */
-            ['catalogue.manage', 'attributes.php', ['colors', 'sleeves', 'necks', 'patterns', 'sizes', 'attributes'], 'fa-filter', 'Filters &amp; Attributes'],
+            ['catalogue.manage', 'attributes.php', ['colors', 'sleeves', 'necks', 'patterns', 'fabrics', 'occasions', 'sizes', 'attributes'], 'fa-filter', 'Filters &amp; Attributes'],
             // brands.php existed, enforced catalogue.manage and worked — but nothing
             // linked to it except setup_database.php, which is itself unlinked. The
             // only route in was typing the URL. This row even claimed 'brands' as one
