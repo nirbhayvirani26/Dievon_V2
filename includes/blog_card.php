@@ -65,7 +65,7 @@ if ($bcTrim > 0 && function_exists('trimToLength')) { $bcExcerpt = trimToLength(
         <a href="<?= htmlspecialchars($bcUrl) ?>">
             <picture>
                 <?php if ($bcHasWebp): ?><source srcset="<?= htmlspecialchars($bcWebpUrl) ?>" type="image/webp"><?php endif; ?>
-                <img src="<?= htmlspecialchars($bcImg) ?>" alt="<?= htmlspecialchars((string)$bcPost['title']) ?>"
+                <img src="<?= htmlspecialchars(pictureImgSrc($bcImg, $bcHasWebp ? $bcWebpUrl : null)) ?>" alt="<?= htmlspecialchars((string)$bcPost['title']) ?>"
                      class="blog-card-img" loading="lazy" decoding="async">
             </picture>
         </a>

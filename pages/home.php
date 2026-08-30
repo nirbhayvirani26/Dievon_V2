@@ -329,7 +329,7 @@ $heroSlideCount = !empty($heroBanners)
                     <div class="slide-media">
                         <picture>
                             <?php if ($imgWebp): ?><source srcset="<?= htmlspecialchars(cacheBustedUploadUrl($imgWebp)) ?>" type="image/webp"><?php endif; ?>
-                            <img src="<?= htmlspecialchars(cacheBustedUploadUrl($imgUrl)) ?>"
+                            <img src="<?= htmlspecialchars(cacheBustedUploadUrl(pictureImgSrc($imgUrl, $imgWebp))) ?>"
                                  alt="<?= htmlspecialchars($banner['title'] ?? 'Dievon collection') ?>"
                                  class="slide-img"
                                  <?= $idx === 0 ? 'fetchpriority="high" decoding="async"' : 'decoding="async"' ?>
@@ -634,7 +634,7 @@ $heroSlideCount = !empty($heroBanners)
                class="category-card zoom-box<?= $catIndex === 0 ? ' is-feature' : '' ?>">
                 <picture>
                     <?php if ($catImgWebp): ?><source srcset="<?= htmlspecialchars($catImgWebp) ?>" type="image/webp"><?php endif; ?>
-                    <img class="zoom-img" src="<?= $catImgSrc ?>"
+                    <img class="zoom-img" src="<?= htmlspecialchars(pictureImgSrc($catImgSrc, $catImgWebp)) ?>"
                          alt="<?= htmlspecialchars($cat['name']) ?> collection"
                          width="800" height="1000" loading="lazy" decoding="async">
                 </picture>
@@ -1554,7 +1554,7 @@ if ($occasions) {
                                  make a screen reader announce every tile twice. */ ?>
                         <picture>
                             <?php if ($occWebp): ?><source srcset="<?= htmlspecialchars($occWebp) ?>" type="image/webp"><?php endif; ?>
-                            <img src="<?= SITE_URL ?>/uploads/products/<?= htmlspecialchars($occCover) ?>"
+                            <img src="<?= htmlspecialchars(pictureImgSrc(SITE_URL . '/uploads/products/' . $occCover, $occWebp)) ?>"
                                  alt="" loading="lazy" decoding="async" class="occasion-tile-img">
                         </picture>
                     <?php else: ?>

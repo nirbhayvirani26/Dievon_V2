@@ -834,7 +834,7 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php $gWebp = webpUrlIfExists('products', $gFile); ?>
                         <picture>
                             <?php if ($gWebp): ?><source srcset="<?= htmlspecialchars($gWebp) ?>" type="image/webp"><?php endif; ?>
-                            <img src="<?= SITE_URL ?>/uploads/products/<?= htmlspecialchars($gFile) ?>" alt="<?= htmlspecialchars(productImageAlt($product, $gIndex === 0 ? '' : 'View ' . ($gIndex + 1))) ?>" class="gallery-grid-img">
+                            <img src="<?= htmlspecialchars(pictureImgSrc(SITE_URL . '/uploads/products/' . $gFile, $gWebp)) ?>" alt="<?= htmlspecialchars(productImageAlt($product, $gIndex === 0 ? '' : 'View ' . ($gIndex + 1))) ?>" class="gallery-grid-img">
                         </picture>
                     </div>
                     <?php endforeach; ?>
@@ -2643,7 +2643,7 @@ document.addEventListener('keydown', e => {
                             ${i === 0 ? badgeHtml : ''}
                             <picture>
                                 ${im.webp ? `<source srcset="${im.webp}" type="image/webp">` : ''}
-                                <img src="${im.src}" alt="${escHtml(color.color_name)} - Image ${i + 1}" class="gallery-grid-img">
+                                <img src="${im.webp || im.src}" alt="${escHtml(color.color_name)} - Image ${i + 1}" class="gallery-grid-img">
                             </picture>
                         </div>`).join('') + videoHtml;
                     /* Commit the hidden state before revealing it.

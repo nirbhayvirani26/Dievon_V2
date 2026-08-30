@@ -156,7 +156,7 @@ $cardUrl = productUrl($cardProduct['id'], $cardProduct['name'], $cardProduct['se
             ?>
                 <picture>
                     <?php if ($cardWebp): ?><source srcset="<?= htmlspecialchars($cardWebp) ?>" type="image/webp"><?php endif; ?>
-                    <img src="<?= SITE_URL ?>/uploads/products/<?= htmlspecialchars($cardProduct['image']) ?>"
+                    <img src="<?= htmlspecialchars(pictureImgSrc(SITE_URL . '/uploads/products/' . $cardProduct['image'], $cardWebp)) ?>"
                          alt="<?= htmlspecialchars($cardAlt) ?>" decoding="async" class="card-img"
                          loading="<?= $cardEager ? 'eager' : 'lazy' ?>"<?= $cardEager ? ' fetchpriority="high"' : '' ?>>
                 </picture>

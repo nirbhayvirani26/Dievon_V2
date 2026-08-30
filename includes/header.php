@@ -985,7 +985,7 @@ $searchHint = $searchHintNames
                                            aria-label="Shop <?= htmlspecialchars($pName) ?>"<?= $pIdx ? ' tabindex="-1" aria-hidden="true"' : '' ?>>
                                             <picture>
                                                 <?php if ($pPromo['webp']): ?><source srcset="<?= htmlspecialchars($pPromo['webp']) ?>" type="image/webp"><?php endif; ?>
-                                                <img src="<?= htmlspecialchars($pPromo['src']) ?>" alt="<?= htmlspecialchars($pName) ?>" loading="lazy">
+                                                <img src="<?= htmlspecialchars(pictureImgSrc($pPromo['src'], $pPromo['webp'])) ?>" alt="<?= htmlspecialchars($pName) ?>" loading="lazy">
                                             </picture>
                                         </a>
                                         <?php endforeach; ?>
@@ -996,7 +996,7 @@ $searchHint = $searchHintNames
                                             <?php if ($pTileImg): ?>
                                             <picture>
                                                 <?php if ($pTileWebp): ?><source srcset="<?= htmlspecialchars($pTileWebp) ?>" type="image/webp"><?php endif; ?>
-                                                <img src="<?= htmlspecialchars($pTileImg) ?>" alt="" loading="lazy">
+                                                <img src="<?= htmlspecialchars(pictureImgSrc($pTileImg, $pTileWebp)) ?>" alt="" loading="lazy">
                                             </picture>
                                             <?php endif; ?>
                                             <span class="mega-promo-tile-body">

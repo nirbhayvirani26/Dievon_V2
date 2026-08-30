@@ -5751,6 +5751,33 @@ function webpUrlIfExists($uploadsSubdir, $filename) {
 }
 
 /**
+ * The URL the <img> inside a WebP <picture> should carry.
+ *
+ * A <picture> is supposed to fetch ONE file: the browser takes the WebP
+ * <source> and the <img> src is only the fallback for a browser that cannot
+ * read it. On the home page that stopped being true — every product photograph
+ * was fetched TWICE, once as the WebP that was painted and once as the JPEG
+ * fallback that nothing ever displayed. Measured on a cold load: 6.06 MB of
+ * JPEG across 11 photographs, against 0.85 MB of WebP that was actually shown,
+ * so the page pulled roughly eight times the image bytes it put on screen.
+ *
+ * Pointing the fallback at the SAME WebP file makes the second request
+ * impossible rather than merely unlikely: whichever candidate the browser
+ * resolves to, it is one URL and therefore one fetch. That is deliberately a
+ * blunter instrument than chasing whichever DOM operation provoked the reload —
+ * it cannot regress the day some other script touches those images.
+ *
+ * The <picture>/<source> wrapper is kept so every CSS rule and script that
+ * expects `picture > img` keeps matching. Returns the original whenever there
+ * is no fresh WebP twin, so a product whose WebP is missing or stale still
+ * renders its real photograph.
+ */
+function pictureImgSrc(string $originalUrl, ?string $webpUrl): string
+{
+    return ($webpUrl !== null && $webpUrl !== '') ? $webpUrl : $originalUrl;
+}
+
+/**
  * May this WebP twin actually be served?
  *
  * False when the twin is missing, or when it is STALE — older than the file it

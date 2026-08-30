@@ -101,10 +101,13 @@ require_once __DIR__ . '/../includes/header.php';
         <!-- Feature Image -->
         <div style="border: 1px solid var(--border-light); padding: 10px; background: var(--bg-surface); margin-bottom: 50px;">
             <?php $artWebp = preg_replace('/\.[^.]+$/', '.webp', $imgUrl);
-                  $artWebpFile = str_replace(SITE_URL . '/', __DIR__ . '/../', $artWebp); ?>
+                  $artWebpFile = str_replace(SITE_URL . '/', __DIR__ . '/../', $artWebp);
+                  // Resolved once: the <source> and the <img> fallback must agree, or
+                  // the browser fetches the original alongside the WebP it displays.
+                  $artUseWebp = webpSourceIsFresh($imgUrl, $artWebpFile); ?>
             <picture>
-                <?php if (webpSourceIsFresh($imgUrl, $artWebpFile)): ?><source srcset="<?= htmlspecialchars(cacheBustedUploadUrl($artWebp)) ?>" type="image/webp"><?php endif; ?>
-                <img src="<?= htmlspecialchars(cacheBustedUploadUrl($imgUrl)) ?>" alt="<?= htmlspecialchars($article['title']) ?>" class="article-hero-img">
+                <?php if ($artUseWebp): ?><source srcset="<?= htmlspecialchars(cacheBustedUploadUrl($artWebp)) ?>" type="image/webp"><?php endif; ?>
+                <img src="<?= htmlspecialchars(cacheBustedUploadUrl(pictureImgSrc($imgUrl, $artUseWebp ? $artWebp : null))) ?>" alt="<?= htmlspecialchars($article['title']) ?>" class="article-hero-img">
             </picture>
         </div>
 
