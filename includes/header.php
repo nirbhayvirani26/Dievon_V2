@@ -364,15 +364,75 @@ $searchHint = $searchHintNames
     <link rel="canonical" href="<?= htmlspecialchars($canonicalHref) ?>">
     <?php endif; ?>
 
+    <?php
+    /* Organization + WebSite, and the sameAs that was missing.
+       ────────────────────────────────────────────────────────────────────────
+       This block named the brand, the URL and the logo, and stopped there. The
+       one attribute that actually does the work for a BRANDED search — sameAs —
+       was absent from the whole codebase, while the footer has been linking the
+       Instagram and Facebook profiles all along. So the shop pointed at its own
+       profiles and never told Google those profiles ARE the shop.
+
+       That gap is why a search for the brand answers out of Instagram: Google
+       had the profiles and the domain as two unrelated things, and the profiles
+       carry the audience. sameAs is the claim that joins them, and it has to be
+       reciprocal — the profiles link here, this now links back.
+
+       alternateName is the other half. The site calls itself "Dievon", the
+       handles are dievonwear, and Google's own summary says "Dievon Wear". A
+       brand spelled two ways is two weak entities instead of one strong one.
+
+       Built in PHP rather than typed as JSON so an unset social URL is dropped
+       instead of emitting an empty string, which is a schema error. json_encode
+       with JSON_HEX_TAG also means a stray closing script tag in a setting
+       cannot break out of the block — the hand-written version had no guard. */
+    $dvSameAs = array_values(array_filter(array_map(
+        static fn($u) => trim((string)$u),
+        [SHOP_SOCIAL_INSTAGRAM, SHOP_SOCIAL_FACEBOOK, SHOP_SOCIAL_YOUTUBE,
+         SHOP_SOCIAL_PINTEREST, SHOP_SOCIAL_TUMBLR]
+    ), static fn($u) => $u !== ''));
+
+    $dvOrg = [
+        '@context'      => 'https://schema.org',
+        '@type'         => 'Organization',
+        'name'          => SHOP_NAME,
+        // The handles and Google's own summary both say "Dievon Wear".
+        'alternateName' => SHOP_NAME . ' Wear',
+        'url'           => SITE_URL . '/',
+        'logo'          => siteLogoUrl($pdo ?? null),
+        'description'   => SHOP_TAGLINE,
+    ];
+    if ($dvSameAs !== []) { $dvOrg['sameAs'] = $dvSameAs; }
+
+    $dvOrgEmail = function_exists('shopContactEmail') ? shopContactEmail($pdo ?? null) : '';
+    $dvOrgPhone = function_exists('shopPhone') ? shopPhone() : '';
+    if ($dvOrgEmail !== '' || $dvOrgPhone !== '') {
+        $dvContact = ['@type' => 'ContactPoint', 'contactType' => 'customer service'];
+        if ($dvOrgEmail !== '') { $dvContact['email']     = $dvOrgEmail; }
+        if ($dvOrgPhone !== '') { $dvContact['telephone'] = $dvOrgPhone; }
+        $dvOrg['contactPoint'] = $dvContact;
+    }
+
+    /* The site-name signal. Without a WebSite node Google picks a display name
+       for the result itself, usually the bare domain. */
+    $dvSite = [
+        '@context'      => 'https://schema.org',
+        '@type'         => 'WebSite',
+        'name'          => SHOP_NAME,
+        'alternateName' => SHOP_NAME . ' Wear',
+        'url'           => SITE_URL . '/',
+    ];
+
+    $dvJsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    ?>
     <!-- Schema.org Organization Structured Data -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Dievon",
-      "url": "<?= SITE_URL ?>",
-      "logo": "<?= htmlspecialchars(siteLogoUrl($pdo ?? null)) ?>"
-    }
+    <?= json_encode($dvOrg, $dvJsonFlags) ?>
+
+    </script>
+    <script type="application/ld+json">
+    <?= json_encode($dvSite, $dvJsonFlags) ?>
+
     </script>
 
     <!-- Preconnect for performance -->
