@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/config.php';
 $pageTitle = "Returns & Refunds Policy | Dievon";
 // Its own description. These pages all fell back to the shop-wide default,
 // so ten indexable URLs described themselves with one identical sentence.
-$metaDescription = "How to return or exchange a Dievon garment: the window, the condition we need it in, how refunds are issued and how long they take.";
+$metaDescription = "How to return or exchange a Dievon garment: the window, the condition we need it in, who pays return postage, and how refunds are issued.";
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
@@ -58,7 +58,17 @@ require_once __DIR__ . '/../includes/header.php';
             <h2 class="legal-heading">2. How to Request a Return</h2>
             <p class="legal-text">To initiate a return, visit your customer account dashboard or email <a href="mailto:<?= htmlspecialchars(shopContactEmail($pdo ?? null)) ?>" class="legal-link"><?= htmlspecialchars(shopContactEmail($pdo ?? null)) ?></a> with your order number &mdash; it looks like <strong><?= htmlspecialchars(orderCodeExample()) ?></strong> and is on your confirmation email and your invoice. We will reply with the return address and confirm how the item should be sent back.</p>
 
-            <h2 class="legal-heading">3. Refund Processing</h2>
+            <?php /* Who pays to send the garment back.
+                     ───────────────────────────────────────────────────────────────────────────
+                     The page said how to start a return and how the refund is
+                     issued, but never who bears the postage in between — the
+                     question a customer weighs before deciding whether to return
+                     at all, and one Google Merchant Center checks when it
+                     validates the returns policy behind a product listing. */ ?>
+            <h2 class="legal-heading">3. Return Shipping Costs</h2>
+            <p class="legal-text">If the garment reached you faulty or damaged, or is not the item you ordered, Dievon covers the cost of sending it back &mdash; tell us when you request the return and we will confirm how to send it at our expense. For any other reason, including a change of mind or a different size, the cost of returning the garment to us is the customer’s.</p>
+
+            <h2 class="legal-heading">4. Refund Processing</h2>
             <p class="legal-text-last">Once your returned garment passes boutique inspection, your refund will be processed back to your original payment method within 3–5 business days.</p>
         </div>
     </div>
