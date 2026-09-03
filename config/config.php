@@ -2974,16 +2974,36 @@ function dievonHomeDescription(?PDO $pdo): string {
     $genders = [];
     if ($pdo !== null) {
         try {
-            foreach ($pdo->query(
-                "SELECT c.id, c.name,
-                        (SELECT COUNT(*) FROM products p
-                          WHERE (p.category_id = c.id OR p.category = c.name)
-                            AND p.available = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL)) AS live
-                   FROM categories c
+            /* Count the whole branch, not just what hangs off the parent row.
+               ────────────────────────────────────────────────────────────────
+               This counted products whose category_id IS the top-level row, so a
+               shop that files its garments in subcategories — Kurtis > Short
+               Kurtis, Kurtis > 3 Pis Kurti Set — showed zero against the parent
+               and the parent was dropped from the sentence. On dievon.com that
+               left one name where there were several: "contemporary co-ord set",
+               singular, as the whole description of a shop selling kurtis too.
+               A description that names one category advertises one category.
+
+               categoryDescendantIds() already walks the tree for the shop filter
+               and guards against a cycle, so the branch is counted the same way
+               here as everywhere else. */
+            $topRows = $pdo->query(
+                "SELECT c.id, c.name FROM categories c
                   WHERE c.parent_id = 0 OR c.parent_id IS NULL
                   ORDER BY c.sort_order ASC, c.name ASC"
-            ) as $r) {
-                if ((int)$r['live'] > 0) {
+            )->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($topRows as $r) {
+                $branch = categoryDescendantIds($pdo, (int)$r['id']);
+                $ph     = implode(',', array_fill(0, count($branch), '?'));
+                $cnt    = $pdo->prepare(
+                    "SELECT COUNT(*) FROM products p
+                      WHERE (p.category_id IN ($ph) OR p.category = ?)
+                        AND p.available = 1 AND (p.is_deleted = 0 OR p.is_deleted IS NULL)"
+                );
+                $cnt->execute(array_merge($branch, [$r['name']]));
+
+                if ((int)$cnt->fetchColumn() > 0) {
                     $names[] = mb_strtolower($r['name']);
                     $genders[categoryGender((int)$r['id'])] = true;
                 }
