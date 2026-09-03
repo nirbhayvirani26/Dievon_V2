@@ -11,13 +11,35 @@ $pageTitle = "Shipping & Delivery Policy | Dievon";
 $metaDescription = "Dievon delivery times, courier partners and charges across India, the free-delivery threshold, and how international orders are handled.";
 require_once __DIR__ . '/../includes/header.php';
 
-// Read the REAL rates rather than restating them in prose. This page previously
-// promised "free over £150, flat £15.00" while checkout actually charged ₹99 and
-// gave free delivery over ₹2000 — wrong currency and wrong numbers, on the page
-// customers read before deciding to buy. Now the policy cannot drift from what
-// checkout charges, because both read the same Store Settings.
-$shipFreeMin = (float)storeSetting($pdo, 'free_shipping_min', 2000);
-$shipFee     = (float)storeSetting($pdo, 'standard_shipping_fee', 99);
+/* Ask the same function that charges, not the settings row it used to read.
+   ────────────────────────────────────────────────────────────────────────
+   The note that used to sit here said the policy could not drift from
+   checkout "because both read the same Store Settings". That stopped being
+   true when shippingCostForZone() learned to prefer the home country's own
+   row and keep standard_shipping_fee only as a fallback. Two sources again,
+   and they had already disagreed on the live shop: Countries said ₹99 and
+   was what every customer actually paid, while this page read ₹120 out of
+   Settings and printed it as the delivery charge — a published rate the
+   checkout has never charged, on the page people read before deciding to buy.
+
+   A total of 0 is deliberately below any free-delivery threshold, so what
+   comes back is the flat fee itself. The page now cannot state a number the
+   checkout would not charge, whichever source that number came from.
+
+   The threshold is resolved the same way, home row first.
+
+   International stays on the global setting. shippingCostForZone() resolves
+   that zone against the DESTINATION country, and read from this page there is
+   no destination — currentCountryCode() answers with the home country, so the
+   call returns India's own ₹99 and the page would announce that as the
+   international rate. The global figure is what checkout falls back to for a
+   country with no row of its own, which is the only rate this sentence can
+   honestly promise to every reader at once. */
+$shipHome    = homeCountryRow();
+$shipFreeMin = (function_exists('freeShippingMinForCountry') && $shipHome !== null)
+    ? (float)freeShippingMinForCountry($pdo, $shipHome['country_code'] ?? null)
+    : (float)storeSetting($pdo, 'free_shipping_min', 2000);
+$shipFee     = shippingCostForZone('domestic', 0.0, $pdo);
 $shipIntlFee = (float)storeSetting($pdo, 'international_shipping_fee', 2500);
 
 // Whether this page may promise delivery abroad. It used to say so unconditionally
