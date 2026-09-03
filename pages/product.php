@@ -499,9 +499,24 @@ require_once __DIR__ . '/../includes/header.php';
     // ── Availability: the same formula the cart enforces ──
     $schemaInStock = productIsInStock($product, $variants, $productColors);
 
-    // ── Shipping, from the figures the checkout actually charges ──
+    /* ── Shipping, from the figures the checkout actually charges ──
+       This line read standard_shipping_fee, which is the box on the Settings
+       screen that shippingCostForZone() stopped consulting when Countries
+       became the single source — it is disabled in admin for exactly that
+       reason. So the comment above was already untrue: editing the fee under
+       Countries changed what every customer paid and left this number alone,
+       and this number is the one Google reads out of the product's structured
+       data and prints beside the listing. A shop quoting one postage in search
+       results and charging another at checkout is the mismatch Merchant Center
+       suspends listings over.
+
+       Asking shippingCostForZone() with a total of 0 keeps it below any
+       free-delivery threshold, so what comes back is the flat fee itself —
+       the same call, and therefore the same answer, as the checkout line.
+       google_merchant_feed.php already resolved it this way; the two files
+       describe the same postage to the same crawler and now agree. */
     $schemaCurrency  = getCurrentCurrency();
-    $schemaShipFee   = (float)storeSetting($pdo, 'standard_shipping_fee', 99);
+    $schemaShipFee   = shippingCostForZone('domestic', 0.0, $pdo);
     $schemaFreeOver  = freeShippingMinForCountry($pdo);
     $schemaCountry   = function_exists('currentCountryCode') ? currentCountryCode() : 'IN';
     // Free delivery above the threshold is what a shopper buying this piece would
