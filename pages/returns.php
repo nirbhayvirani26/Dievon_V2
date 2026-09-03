@@ -68,7 +68,27 @@ require_once __DIR__ . '/../includes/header.php';
             <h2 class="legal-heading">3. Return Shipping Costs</h2>
             <p class="legal-text">If the garment reached you faulty or damaged, or is not the item you ordered, Dievon covers the cost of sending it back &mdash; tell us when you request the return and we will confirm how to send it at our expense. For any other reason, including a change of mind or a different size, the cost of returning the garment to us is the customer’s.</p>
 
-            <h2 class="legal-heading">4. Refund Processing</h2>
+            <?php /* Exchanges, said out loud.
+                     ───────────────────────────────────────────────────────────────────────────
+                     The page described returns and refunds and never mentioned an
+                     exchange, while the meta description and the subtitle both
+                     promised them — a claim visible to a crawler and to nobody
+                     reading the page. Merchant Center asks whether exchanges are
+                     accepted and then checks the answer against this page, so the
+                     declaration could not honestly be made either way.
+
+                     Size is the reason this matters for a garment shop: 36 to 44 on
+                     one kurta set, bought without trying it on. "Send it back and
+                     order again" is two postages and a wait; asking for the next size
+                     up is the thing customers actually want.
+
+                     Conditions are deliberately the same as a return rather than a
+                     second set to remember — same window, same state, same route in.
+                     Postage follows section 3 for the same reason. */ ?>
+            <h2 class="legal-heading">4. Exchanges</h2>
+            <p class="legal-text">If a piece does not fit, you may exchange it for another size or colour of the same garment on the same terms as a return &mdash; unworn, unaltered, in its original packaging with tags attached, within <?= (int)RETURN_WINDOW_DAYS ?> days of delivery. Request it the way you would a return and tell us the size or colour you would like instead. Exchanges depend on that piece being in stock; if it is not, we will refund you in full rather than keep you waiting. Return postage follows the rule above &mdash; ours if the garment was faulty or wrongly sent, yours if the size or the choice has changed &mdash; and we cover the cost of sending the replacement out to you.</p>
+
+            <h2 class="legal-heading">5. Refund Processing</h2>
             <p class="legal-text-last">Once your returned garment passes boutique inspection, your refund will be processed back to your original payment method within 3–5 business days.</p>
         </div>
     </div>
