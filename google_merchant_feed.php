@@ -22,8 +22,34 @@ header('Content-Type: application/xml; charset=utf-8');
 
 $currency = getCurrentCurrency();
 $country  = function_exists('currentCountryCode') ? currentCountryCode() : 'IN';
-$shipFee  = (float)storeSetting($pdo, 'standard_shipping_fee', 99);
-$freeOver = (float)storeSetting($pdo, 'free_shipping_min', 0);
+/* The two shipping numbers, resolved the way checkout resolves them.
+   ────────────────────────────────────────────────────────────────────────────
+   These read the GLOBAL store_settings figures, while shippingFeeFor() in
+   config.php charges from the HOME COUNTRY row — the same split that comment
+   already warns about for the product page. The Countries screen carries a
+   shipping_fee and a free_shipping_min per country (IN: 120 and 2000), so
+   editing the India row moved what a shopper is charged while the feed kept
+   quoting the old global number. A feed that disagrees with the landing page
+   about postage is a price mismatch, and Merchant Center disapproves items for
+   exactly that.
+
+   The free-shipping default was also 0 here against 2000 everywhere else, and
+   0 does not merely differ — it disables the threshold outright, because the
+   test below is `$freeOver > 0`. With the setting absent the feed would have
+   charged postage on every item while the shop gave it away free.
+
+   Nothing changes in today's output: every garment is priced ₹898–₹1,799, all
+   under the ₹2,000 threshold, so all 115 rows carry the flat fee either way.
+   This is about the next time someone edits a rate in admin. */
+$homeCountry = function_exists('homeCountryRow') ? homeCountryRow() : null;
+
+$shipFee = ($homeCountry !== null && isset($homeCountry['shipping_fee']) && $homeCountry['shipping_fee'] !== null)
+    ? (float)$homeCountry['shipping_fee']
+    : (float)storeSetting($pdo, 'standard_shipping_fee', 99);
+
+$freeOver = (function_exists('freeShippingMinForCountry') && $homeCountry !== null)
+    ? freeShippingMinForCountry($pdo, $homeCountry['country_code'] ?? null)
+    : (float)storeSetting($pdo, 'free_shipping_min', 2000);
 
 $products = [];
 try {
