@@ -198,7 +198,26 @@ require_once __DIR__ . '/../includes/header.php';
                 <p class="contact-block">
                     Monday to Saturday: 10:00 AM – 7:00 PM<br>
                     Sunday: 12:00 PM – 6:00 PM<br>
-                    <?php if ($shopPhone !== ''): ?>Concierge Line: <strong><?= htmlspecialchars($shopPhone) ?></strong><?php endif; ?>
+                    <?php if ($shopPhone !== ''):
+                        /* The concierge line, as something a phone can actually dial.
+                           ──────────────────────────────────────────────────────────
+                           This was the one contact method on the page printed as
+                           plain text: the email addresses below are mailto: links and
+                           WhatsApp is a link in the footer, dock and floating button,
+                           but the number a customer is most likely to want on a phone
+                           could only be copied out by hand. tel: is the whole fix.
+
+                           The visible string keeps its spacing — it is easier to read
+                           and to repeat aloud — while the href carries the digits on
+                           their own, which is all a dialler accepts. A bare ten-digit
+                           number typed into the admin panel gets +91, since the shop
+                           ships within India; anything already carrying a country code
+                           is passed through untouched rather than guessed at. */
+                        $shopPhoneHref = preg_replace('/[^0-9+]/', '', $shopPhone);
+                        if ($shopPhoneHref !== '' && $shopPhoneHref[0] !== '+' && strlen($shopPhoneHref) === 10) {
+                            $shopPhoneHref = '+91' . $shopPhoneHref;
+                        }
+                    ?>Concierge Line: <a href="tel:<?= htmlspecialchars($shopPhoneHref) ?>" class="contact-link"><strong><?= htmlspecialchars($shopPhone) ?></strong></a><?php endif; ?>
                 </p>
 
                 <h3 class="contact-sub-title">Digital Desk</h3>
