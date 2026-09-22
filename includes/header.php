@@ -446,6 +446,29 @@ $searchHint = $searchHintNames
     $faviconDark  = siteFaviconDarkUrl($pdo ?? null);
     ?>
     <?php if ($faviconDark): ?>
+    <?php /* An icon with no media query, declared before the pair.
+             ──────────────────────────────────────────────────────────────────
+             With a dark variant set, EVERY rel="icon" on the page carried a
+             media attribute and there was no unconditional one. A consumer that
+             does not evaluate prefers-color-scheme — and Google's favicon
+             documentation never says it does — is left choosing between two
+             conditional links. Take the last and it gets the DARK-mode file,
+             which is the pale logo meant for a dark tab strip: on a search
+             result's white background that is a near-invisible icon.
+
+             Listed FIRST, not last, and that ordering is the whole point. The
+             note below this block records that a later rel="icon" beats an
+             earlier one, so placing it last would override the admin's chosen
+             512px artwork in every browser. First, it changes nothing for a
+             browser that reads media — the matching light or dark link still
+             comes after and still wins — while a consumer that ignores media,
+             or takes the first icon it finds, now has a legible one to take.
+
+             Belt and braces with /favicon.ico, which is already served at the
+             web root and is already the dark-ink artwork. This does not force
+             Google's hand; it removes the case where the only answer available
+             was the wrong one. */ ?>
+    <link rel="icon" type="<?= siteFaviconMime($pdo ?? null, $faviconLight) ?>" href="<?= htmlspecialchars($faviconLight) ?>">
     <link rel="icon" type="<?= siteFaviconMime($pdo ?? null, $faviconLight) ?>" href="<?= htmlspecialchars($faviconLight) ?>" media="(prefers-color-scheme: light)">
     <link rel="icon" type="<?= siteFaviconMime($pdo ?? null, $faviconDark) ?>" href="<?= htmlspecialchars($faviconDark) ?>" media="(prefers-color-scheme: dark)">
     <?php else: ?>
