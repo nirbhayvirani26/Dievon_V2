@@ -692,6 +692,35 @@ require_once __DIR__ . '/../includes/header.php';
             ],
         ];
         if (isset($v['_color'])) { $entry['color'] = $v['_color']; }
+
+        /* A variant is a Product, and a Product without an image is invalid.
+           ────────────────────────────────────────────────────────────────────
+           The ProductGroup above carries every photograph of the garment, and
+           each hasVariant entry carried none — name, sku, size, offers and
+           nothing to look at. Google requires image on Product, so Search
+           Console reports every one of these as "Missing field image" and the
+           whole item becomes ineligible for rich results. It read as five
+           invalid items because only one product page had been crawled; the
+           count grows with each one Google reaches.
+
+           The variant's OWN colourway is preferred over the parent's first
+           photograph, because that is the garment a shopper choosing Rose would
+           be shown, and a size row on a colour with its own gallery should not
+           advertise the default colour's picture. Falls back to the group's
+           best image, which $schemaImages already has ordered best-first. */
+        $vImage    = '';
+        $vColorRow = $v['_colorRow'] ?? null;
+        if (is_array($vColorRow)) {
+            foreach (($vColorRow['images'] ?? []) as $ci) {
+                if (!empty($ci['image'])) {
+                    $vImage = SITE_URL . '/uploads/products/' . $ci['image'];
+                    break;
+                }
+            }
+        }
+        if ($vImage === '' && !empty($schemaImages)) { $vImage = $schemaImages[0]; }
+        if ($vImage !== '') { $entry['image'] = $vImage; }
+
         $schemaVariants[] = $entry;
     }
     if ($schemaVariants) {
