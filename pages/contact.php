@@ -17,8 +17,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['contact_submit'])) {
     /* Same token every other form on the site carries. Without it any page
        anywhere could post an enquiry in a visitor's name, and the row lands in
        admin > Enquiries looking exactly like a real one. */
+    /* Bot protection, which this form alone was missing.
+       ────────────────────────────────────────────────────────────────────────
+       The checkout form carries a honeypot pair and login, orders, verify_email
+       and forgot_password all throttle. This one had the CSRF token and nothing
+       else, so it was the single public form a script could post to freely —
+       and one did, at four enquiries an hour, each one sending TWO emails (the
+       admin alert and the visitor acknowledgement). That is what exhausted the
+       host's sending quota, and a spent quota does not only lose enquiries: the
+       order confirmations and password resets queued behind it do not go out
+       either. The inbox was the symptom; silent transactional mail was the cost.
+
+       The honeypot answers with the ordinary thank-you rather than an error. A
+       hidden field a human never sees has no false positives to apologise for,
+       and a script told it succeeded goes away, while one told it failed comes
+       back having learned something. Nothing is written and nothing is sent. */
+    $cntHoneypot = !empty($_POST['website']);
+    $cntLoadedAt = (int)($_POST['form_loaded_at'] ?? 0);
+    /* Three seconds, against checkout's 2.5: this form asks for a written
+       message, and nobody types one in under three seconds. */
+    $cntTooFast  = $cntLoadedAt > 0 && ((time() * 1000) - $cntLoadedAt) < 3000;
+
+    /* The throttle is per email address over a quarter of an hour, the same
+       shape forgot_password uses. It is the backstop for a script that learns
+       to leave the honeypot alone: the honeypot is what stops the flood, this
+       is what caps what gets through if it ever does. Three is above any
+       genuine use — nobody sends a fourth enquiry within fifteen minutes. */
+    $cntOverLimit = false;
+    $cntEmailRaw  = trim((string)($_POST['email'] ?? ''));
+    if (!$cntHoneypot && !$cntTooFast && $cntEmailRaw !== '') {
+        try {
+            $cntRate = $pdo->prepare(
+                "SELECT COUNT(*) FROM inquiries
+                  WHERE LOWER(email) = :email
+                    AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)"
+            );
+            $cntRate->execute(['email' => mb_strtolower($cntEmailRaw)]);
+            $cntOverLimit = ((int)$cntRate->fetchColumn() >= 3);
+        } catch (PDOException $e) {
+            /* A throttle that cannot read the table must not block a real
+               enquiry — the honeypot above is still doing the heavy lifting. */
+            error_log('Contact form rate-limit check failed: ' . $e->getMessage());
+        }
+    }
+
     if (!verifyCsrfToken($_POST['csrf_token'] ?? '')) {
         $error = 'Your session expired. Please refresh the page and send it again.';
+    } elseif ($cntHoneypot || $cntTooFast) {
+        $success = true;
+    } elseif ($cntOverLimit) {
+        $error = 'We already have your message — our team will be in touch shortly. '
+               . 'Please wait a few minutes before sending another.';
     } else {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
@@ -126,6 +175,13 @@ require_once __DIR__ . '/../includes/header.php';
 
                     <form action="contact.php" method="POST">
                         <input type="hidden" name="csrf_token" value="<?= generateCsrfToken() ?>">
+
+                        <?php /* Bot Honeypot — the same pair the checkout form carries, and
+                                 the same .hp-input class that hides it. A visitor never sees
+                                 or tabs into it; a script fills every field it finds. */ ?>
+                        <input type="text" name="website" id="cntHpWebsite" tabindex="-1" autocomplete="off" aria-hidden="true" class="hp-input">
+                        <input type="hidden" name="form_loaded_at" id="cntHpLoadedAt" value="0">
+                        <script>document.getElementById('cntHpLoadedAt').value = Date.now();</script>
                         <div class="contact-form-row">
                             <div class="form-luxury-group">
                                 <label for="cntName">Full Name *</label>
