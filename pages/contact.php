@@ -43,6 +43,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['contact_submit'])) {
        to leave the honeypot alone: the honeypot is what stops the flood, this
        is what caps what gets through if it ever does. Three is above any
        genuine use — nobody sends a fourth enquiry within fifteen minutes. */
+    /* No links in an enquiry, because the link IS the spam.
+       ────────────────────────────────────────────────────────────────────────
+       The honeypot went up and the flood continued, so whatever is posting is
+       reading the form rather than blindly filling every field. But every one
+       of these messages exists to deliver a shortened URL — that is the entire
+       payload, and the enquiry text around it is set dressing. Refuse the
+       payload and there is nothing left worth the sender's trouble.
+
+       A customer with a genuine link to share is rare on a boutique enquiry
+       form, and is not turned away: the message names the shop's email address
+       so they have somewhere to send it. That is a better trade than the
+       alternatives — a CAPTCHA taxes every real visitor to stop this one
+       sender, and guessing at gibberish names would reject real people with
+       unfamiliar ones.
+
+       Matched loosely on purpose. A bare "example.com" and an obfuscated
+       "example (dot) com" both count, because a link that a human can follow
+       is a link worth refusing. */
+    $cntMessageRaw = (string)($_POST['message'] ?? '');
+    $cntHasLink = (bool)preg_match(
+          '~(?:https?://)'                                    // any explicit scheme
+        . '|(?:\\bwww\\.[a-z0-9-]+\\.[a-z]{2,})'                 // www.something.tld
+        . '|(?<![\\w@.])[a-z0-9][a-z0-9-]{0,61}\\.[a-z]{2,12}/'    // domain.tld/path — an email has no slash
+        . '|\\(\\s*dot\\s*\\)'                                    // "example (dot) com"
+        . '~i',
+        $cntMessageRaw
+    );
+
     $cntOverLimit = false;
     $cntEmailRaw  = trim((string)($_POST['email'] ?? ''));
     if (!$cntHoneypot && !$cntTooFast && $cntEmailRaw !== '') {
@@ -65,6 +93,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['contact_submit'])) {
         $error = 'Your session expired. Please refresh the page and send it again.';
     } elseif ($cntHoneypot || $cntTooFast) {
         $success = true;
+    } elseif ($cntHasLink) {
+        $error = 'For security we cannot accept enquiries containing web links. '
+               . 'Please remove the link and send again, or email us directly at '
+               . htmlspecialchars(shopContactEmail($pdo ?? null)) . '.';
     } elseif ($cntOverLimit) {
         $error = 'We already have your message — our team will be in touch shortly. '
                . 'Please wait a few minutes before sending another.';
