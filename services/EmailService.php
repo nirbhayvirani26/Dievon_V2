@@ -1612,7 +1612,14 @@ class EmailService {
     // ============================================================
     //  6. CONTACT FORM EMAILS (Admin Notification + Customer Acknowledgement)
     // ============================================================
-    public function sendContactFormEmails(string $name, string $email, string $phone, string $subject, string $message): bool {
+    /* $sendAck exists because the acknowledgement is the half of this that
+       cannot be trusted. It is addressed to whatever the form was given, and a
+       flood of enquiries carries fake addresses — so every one of those sends
+       leaves the building, counts against the host's quota and may bounce,
+       which teaches mail providers that this domain sends to addresses that do
+       not exist. The admin alert at least goes somewhere real. The caller
+       decides; nothing about the two messages changes. */
+    public function sendContactFormEmails(string $name, string $email, string $phone, string $subject, string $message, bool $sendAck = true): bool {
         $safeName = htmlspecialchars($name);
         $safeEmail = htmlspecialchars($email);
         $safePhone = htmlspecialchars($phone ?: 'N/A');
@@ -1634,7 +1641,9 @@ class EmailService {
             </div>
         ";
         $adminHtml = $this->wrapLuxuryTemplate("Contact Form Enquiry", "Admin Enquiry Alert", $adminBody);
-        $this->sendMail($this->adminAddress, "Dievon Concierge", "📬 Contact Form: {$safeSubj} from {$safeName}", $adminHtml, 'contact_admin_notice');
+        $adminSent = $this->sendMail($this->adminAddress, "Dievon Concierge", "📬 Contact Form: {$safeSubj} from {$safeName}", $adminHtml, 'contact_admin_notice');
+
+        if (!$sendAck) { return $adminSent; }
 
         // 2. Customer Acknowledgement Email
         $custBody = "

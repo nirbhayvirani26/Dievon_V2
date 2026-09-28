@@ -132,13 +132,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['contact_submit'])) {
                     $messageSaved = false;
                 }
 
-                // Send notification to Admin & Acknowledgement to Customer via EmailService
+                /* One email per enquiry, and never more than a fixed number a day.
+                   ────────────────────────────────────────────────────────────
+                   The honeypot and the link rule turn senders away, but neither
+                   can promise to. This is the part that does not depend on
+                   out-guessing anyone: whatever gets past them, the mail it can
+                   generate is bounded.
+
+                   The acknowledgement is dropped. It is addressed to whatever
+                   the form was given, so on a fake address it is a wasted send
+                   that may bounce and teach providers this domain mails
+                   addresses that do not exist — and the visitor has already
+                   been thanked on screen. That alone halves the volume.
+
+                   The cap then bounds what is left. Past it the enquiry is
+                   still WRITTEN — nothing is lost, it is in admin › Enquiries
+                   like every other — it simply does not also send mail. That
+                   matters more than the inbox: a spent host quota takes the
+                   order confirmations and password resets down with it, and
+                   those cannot be read from a panel later. */
+                $CONTACT_EMAILS_PER_DAY = 12;
+                $cntNotify = true;
+                try {
+                    $cntDay = $pdo->query(
+                        "SELECT COUNT(*) FROM inquiries
+                          WHERE created_at > DATE_SUB(NOW(), INTERVAL 1 DAY)"
+                    );
+                    $cntNotify = ((int)$cntDay->fetchColumn() < $CONTACT_EMAILS_PER_DAY);
+                } catch (PDOException $e) {
+                    /* Unreadable table: notify, rather than going silent on a
+                       real customer because a COUNT failed. */
+                    error_log('Contact form daily-cap check failed: ' . $e->getMessage());
+                }
+
                 $mailSent = false;
                 try {
                     require_once __DIR__ . '/../services/EmailService.php';
-                    $emailService = new EmailService($pdo);
-                    $emailService->sendContactFormEmails($name, $email, $phone, $service, $message);
-                    $mailSent = true;
+                    if ($cntNotify) {
+                        $emailService = new EmailService($pdo);
+                        $emailService->sendContactFormEmails($name, $email, $phone, $service, $message, false);
+                        $mailSent = true;
+                    }
                 } catch (\Throwable $exEmail) {
                     error_log("Contact email dispatch error: " . $exEmail->getMessage());
                 }
